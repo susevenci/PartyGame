@@ -13,23 +13,30 @@ party-games/
 ├── tsconfig.base.json    # 共享 TS 严格配置
 └── packages/
     ├── shared/           # @party-games/shared：协议类型 + 游戏元信息 + 词库（前后端共用，是唯一的“合同”）
+    │   └── src/
+    │       ├── base.ts   # PlayerId / GameId / RoomInfo / DrawOp 等基础结构
+    │       ├── protocol.ts # 消息联合与 GameState / GamePrivate 汇总
+    │       ├── states/   # 每款游戏一个状态 + 私密类型文件
+    │       ├── meta.ts   # GAME_META / GAME_LIST / AVATARS
+    │       └── *-words.ts / fibbage-questions.ts 等各游戏词库
     ├── server/           # @party-games/server：纯 Node + ws，零框架
     │   └── src/
     │       ├── index.ts  # HTTP 静态服务 + WebSocketServer 入口
     │       ├── room.ts   # 房间：座位/房主/生命周期，与具体游戏解耦
-    │       └── games/    # 游戏插件（每个游戏一个文件，实现 Game 接口后在 index.ts 注册）
+    │       └── games/    # 游戏插件（12 款游戏，实现 Game 接口后在 index.ts 注册；util.ts 放公共工具）
     └── client/           # @party-games/client：Vite + React 18 + TS
         └── src/
             ├── net/      # WebSocket hook
             ├── screens/  # 大厅 / 房间等待室
-            ├── games/    # 每个游戏一个视图组件
-            └── components/ # 共用 UI
+            ├── games/    # 每个游戏一个视图组件（12 个）
+            └── components/ # 共用 UI（common.tsx、CanvasBoard.tsx）
 ```
 
 ## 硬性规则
 
-1. **协议唯一来源**：所有前后端消息类型必须定义在 `packages/shared/src/protocol.ts`，
-   禁止在 client/server 里另起一套消息结构。改协议必须先改 shared。
+1. **协议唯一来源**：所有前后端消息类型必须定义在 `packages/shared/src/protocol.ts`；
+   各游戏的状态/私密类型放在 `packages/shared/src/states/<game>.ts`，由 `protocol.ts`
+   汇总为 `GameState` / `GamePrivate`。禁止在 client/server 里另起一套消息结构。改协议必须先改 shared。
 2. **服务端是唯一权威**：发词、计时、判定猜中、投票结果全部在服务端计算；
    客户端只做展示与提交意图。客户端收到的状态（GameState）一律视为不可信展示数据。
 3. **私密信息只发本人**：卧底身份、要画的词等只能走 `game-private` + `sendTo`，
@@ -48,6 +55,8 @@ party-games/
 - 函数尽量 ≤ 50 行、文件 ≤ 400 行；超过就拆。
 - 每个函数做且只做一件事；房间与游戏的职责边界见上文。
 - 注释只写“为什么”和协议约束，不写“这行在干什么”。
+- 画布类玩法统一复用 `client/src/components/CanvasBoard.tsx`（`CanvasBoard` / `StaticCanvas`），
+  不要复制画布渲染与 Pointer Events 逻辑。
 - 错误处理：服务端对未知消息类型静默忽略（向前兼容）；对非法操作回 `error` 消息，
   不向客户端抛 500。
 - UI 文案统一中文；emoji 作为图标的主要手段（无图标库依赖）。
@@ -63,9 +72,8 @@ party-games/
 ## 实时通信规范
 
 - 消息格式：单个 JSON 对象，`type` 字段判别（Discriminated Union）。
-- 断线策略：客户端指数退避重连（1s→10s 封顶）；服务端保留座位标记离线，
-  房间空了才销毁。重连者靠 `room-update` + `getState()` 补状态（当前实现：
-  游戏中断线重连不补状态，v2 再做）。
+- 断线策略：客户端指数退避重连（1s→10s 封顶）；服务端在连接关闭时释放座位并
+  自动转让房主，房间空了立即销毁。重连后需重新 join（v1 没有重连令牌，不补发私密信息）。
 - 广播前检查 `ws.readyState === OPEN`。
 
 ## 工程命令
@@ -75,9 +83,12 @@ npm run dev        # 同时起 server(3000) 与 client(5173, 已配 /ws 代理)
 npm run build      # shared → client → server 依次构建
 npm start          # 生产模式：server 直接托管 client/dist
 npm run typecheck  # 全 workspace 类型检查（提交前必跑）
+npm test           # 构建 shared+server 并跑 13 个协议冒烟测试（含房间生命周期）
+npm run verify     # typecheck + test + build，一条命令完成提交前验证
 ```
 
 - 提交前必须 `npm run typecheck` 通过。
+- CI（`.github/workflows/ci.yml`）会在 push / PR 时执行 `npm ci && npm run verify`。
 - 不引入未讨论的新运行时依赖；新依赖需说明理由。
 
 ## Git 规范（约定式提交）

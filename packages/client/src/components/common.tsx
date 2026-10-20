@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AVATARS, GAME_META } from '@party-games/shared';
-import type { PlayerId, RoomInfo } from '@party-games/shared';
+import type { ClientMessage, PlayerId, RoomInfo } from '@party-games/shared';
 
 export function GameTopBar(props: { room: RoomInfo; onLeave: () => void }) {
   const meta = GAME_META[props.room.game];
@@ -39,6 +39,14 @@ export interface ChatLine {
   name?: string;
   text: string;
   ts: number;
+}
+
+/** 所有游戏视图共用的房间/连接上下文 */
+export interface GameViewProps {
+  room: RoomInfo;
+  myId: PlayerId;
+  send: (m: ClientMessage) => void;
+  feed: ChatLine[];
 }
 
 /** 聊天 + 系统消息滚动区（各游戏共用） */

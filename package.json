@@ -1,6 +1,6 @@
 {
   "name": "party-games",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "多人在线聚会小游戏合集（网页版，手机/电脑浏览器均可玩）",
   "workspaces": [
@@ -14,6 +14,7 @@
     "start": "npm run start -w @party-games/server",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run build -w @party-games/shared && npm run build -w @party-games/server && node tests/run-all.mjs",
+    "verify": "npm run typecheck && npm test && npm run build",
     "preview": "npm run build && npm run start -w @party-games/server"
   },
   "devDependencies": {

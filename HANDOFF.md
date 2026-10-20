@@ -1,12 +1,13 @@
 # 交接文档（HANDOFF）
 
 > 面向后续开发者 / AI Agent：读完 README + 本文 + `CLAUDE.md`，即可继续开发。
-> 更新时间：2026-10-16
+> 版本：0.2.0 · 更新时间：2026-10-20
+> 逐次变更见 [CHANGELOG.md](./CHANGELOG.md)，后续方向见 [ROADMAP.md](./ROADMAP.md)。
 
 ## 一句话现状
 
-**v1 已完成并验证**：3 个聚会小游戏（谁是卧底 / 你画我猜 / 真心话大冒险）的
-完整多人在线功能已实现，服务端协议通过自动化冒烟测试（`npm test` 全绿），
+**v0.2.0 已完成并验证**：12 款聚会小游戏（谁是卧底 / 你画我猜 / 真心话大冒险 / 假画家 / 一字提示 / 波长 / 编瞎话 / 间谍游戏 / 词语炸弹 / 行动代号 / 传话画图 / 阿瓦隆）的
+完整多人在线功能已实现，服务端协议通过 13 个自动化冒烟测试（含房间生命周期，`npm test` 全绿），
 生产构建可一键运行（`npm run build && npm start`），手机/电脑浏览器均可玩。
 代码已推送至 GitHub：<https://github.com/susevenci/PartyGame>（默认分支 `main`）。
 
@@ -17,7 +18,7 @@ git clone https://github.com/susevenci/PartyGame.git
 cd PartyGame
 npm install          # 依赖由 package-lock.json 锁定，Node >= 20
 npm run typecheck    # 应全绿
-npm test             # 自动构建 shared+server 并跑 3 个协议冒烟测试，应全 PASS
+npm test             # 自动构建 shared+server 并跑 12 个协议冒烟测试，应全 PASS
 npm run dev          # 开发：server:3000 + client:5173
 ```
 
@@ -38,30 +39,38 @@ npm run typecheck           # 全 workspace 类型检查（提交前必跑）
 npm run build               # 构建 shared → client → server
 npm start                   # 生产模式：http://localhost:3000（server 托管前端产物）
 npm test                    # 冒烟测试（自动构建 shared+server，起 :3100 测试服务器，跑完自动关）
+npm run verify              # typecheck + test + build，提交前一键验证
 ```
 
 ## 已完成清单（v1）
 
 - [x] Monorepo 工程化（npm workspaces：shared / server / client）
 - [x] 通信协议：`packages/shared/src/protocol.ts`（Discriminated Union，前后端唯一契约）
-- [x] 房间系统：6 位房号、房主制、房主掉线自动转让、空房回收、断线保留座位
+- [x] 房间系统：6 位房号、房主制、房主离开自动转让、空房立即回收、断线释放座位
 - [x] 游戏插件机制：`Game` 接口 + 工厂注册（见 `server/src/games/`）
 - [x] 谁是卧底（4–10 人）：发密牌、夜晚击杀、白天描述、投票放逐、胜负判定
 - [x] 你画我猜（2–8 人）：Canvas 画板（Pointer Events 触摸支持）、笔迹广播、猜词计分、换词
 - [x] 真心话大冒险（2–10 人）：抽卡、自报结果、房主代填/跳过、翻牌回顾
+- [x] 假画家（5–10 人）：共享画布轮流各画一笔、投票、假画家猜词反杀
+- [x] 一字提示（3–7 人）：一个词提示、重复提示作废、合作猜词计分
+- [x] 波长（2–12 人）：光谱目标、主持人线索、滑杆猜位置与距离计分
+- [x] 编瞎话（2–8 人）：编假答案、混入真答案、投票与骗分计分
+- [x] 间谍游戏（3–8 人）：地点私密信息、讨论倒计时、投票指认
+- [x] 词语炸弹（2–12 人）：汉字题面、含字校验、去重、命数与淘汰
+- [x] 行动代号（4–8 人）：5×5 词阵、队长私密颜色、线索与翻牌、刺客判负
+- [x] 传话画图（3–10 人）：写→画→猜接力、私密上一步内容、链路回放
+- [x] 阿瓦隆（5–10 人）：身份分配、组队投票、任务投票、连续否决、终局刺杀
 - [x] 词库：卧底词对 ~95 组、画词 ~96 个、真心话 30 + 大冒险 30
 - [x] 房间等待室：房号复制、局域网地址自动探测（`/api/lan`）、就绪机制
 - [x] 移动端适配：≤520px 布局、safe-area、触摸画布
-- [x] 冒烟测试：`tests/`（多进程 WebSocket 客户端模拟真人流程）
+- [x] 冒烟测试：`tests/`（12 款游戏各一个多进程 WebSocket 客户端测试，`tests/lib.mjs` 共用连接辅助）
 - [x] 规范文档：CLAUDE.md（整合自 awesome-cursorrules-zh）
 - [x] 生产静态托管 + 路径穿越防护
 
 ## 已知限制（v1，续作时先看这里）
 
-1. **断线重连不补私密信息**：游戏中断线后重连，该玩家收不到自己的词牌/画词
-   （`Room.syncTo` 只补公开状态）。修法方向：`hello` 时若 `room.status==='playing'`，
-   服务端重新对该玩家 sendTo 私密信息（服务端需把私密信息缓存在 Game 实例上，
-   目前只有开局时发过一次，未持久保存）。
+1. **断线后座位移除**：v1 没有重连令牌，网络断开即视为离开，需要重新加入；私密信息不会补发
+   （`Room.syncTo` 只补公开状态）。若要做重连，需在 join 时携带旧 playerId 并校验房间。
 2. **卧底夜晚不能手动选刀**：当前由服务端随机击杀一个平民（`werewolf.ts` 的
    `nightKill`）。开放手动选刀：给卧底加 `type:'night-target'` 消息 + 夜晚阶段超时兜底。
 3. **你画我猜的画布历史上限 300 笔**（App.tsx 里 `slice(-300)`），超长局可能丢旧笔画。
@@ -69,7 +78,10 @@ npm test                    # 冒烟测试（自动构建 shared+server，起 :3
    （注意 `/ws` 与动态地址，SW 只做缓存不拦截 WS）。
 5. **猜测匹配偏宽松**：`drawing.ts` 的 `handleGuess` 允许子串匹配，"猫" 能猜中 "熊猫"。
 6. **无前端组件测试**：目前只有服务端协议冒烟测试。
-7. 谁是卧底的描述阶段是 30s 计时提示（口头描述），未做"轮到谁发言"的强提示高亮。
+7. 谁是卧底的描述阶段是 30s 计时提示（口头描述），未做“轮到谁发言”的强提示高亮。
+8. **阿瓦隆是简化版**：只有梅林 / 刺客 / 爪牙 / 忠臣，没有派西维尔、莫甘娜、莫德雷德；第 4 轮 7 人以上需要 2 张失败票。
+9. **词语炸弹是中文改编版**：只校验「含指定汉字 + 不重复 + 纯中文 + 2~8 字」，不做真实词典校验。
+10. **内容量偏小**：假画家 46 词、一字提示 60 词、编瞎话 32 题、波长 30 组、行动代号 120 词、间谍 28 地点，持续扩充。
 
 ## 规划中的 v2 候选（按建议优先级）
 
@@ -93,6 +105,10 @@ npm test                    # 冒烟测试（自动构建 shared+server，起 :3
 - **ESM + `.ts` 扩展名相对导入**：tsc 用 `rewriteRelativeImportExtensions` 编译出
   `.js` 引用。**新增/修改 import 时必须带 `.ts` 扩展名**（server 与 shared 包内），
   否则 Node 运行时解析失败。
+- **状态类型按游戏拆分到 `shared/src/states/`**：`protocol.ts` 仍是唯一消息契约，
+  通过 `GameState` / `GamePrivate` 汇总，避免单文件无限膨胀。
+- **画布能力抽到 `client/src/components/CanvasBoard.tsx`**：你画我猜、假画家、传话画图
+  共用渲染与笔迹上送，新增画布玩法不要复制粘贴渲染逻辑。
 
 ## 目录速查
 
@@ -103,25 +119,25 @@ party-games/
 ├── HANDOFF.md           ← 本文（开发者/Agent 向：现状/坑/路线）
 ├── packages/
 │   ├── shared/          协议契约 + 元信息 + 词库
-│   │   └── src/{protocol,meta,words,drawing-words,truth-dare}.ts
+│   │   └── src/{base,protocol,meta,index}.ts、states/(12 款游戏状态)、各游戏词库文件
 │   ├── server/          纯 Node + ws
-│   │   └── src/{index.ts(入口/HTTP/WS), room.ts(房间), games/(三个游戏+types+注册)}
+│   │   └── src/{index.ts(入口/HTTP/WS), room.ts(房间), games/(12 款游戏 + types + util + 注册)}
 │   └── client/          Vite + React 18
 │       └── src/{App.tsx, main.tsx, styles.css, net/useSocket.ts,
-│                 screens/{Lobby,Room}.tsx, games/{三个视图}.tsx, components/common.tsx}
+│                 screens/{Lobby,Room}.tsx, games/(12 个视图), components/{common,CanvasBoard}.tsx}
 └── tests/               冒烟测试（run-all.mjs 自动起停服务器）
 ```
 
 ## 添加一个新小游戏的标准步骤（照抄）
 
-1. `shared/src/protocol.ts`：在 `GameId` 联合类型加 id；新增 `XxxState`（进 `GameState`
-   联合）；如需新消息加进 `ClientMessage` / `ServerMessage`。
+1. `shared/src/states/xxx.ts`：新增状态与私密信息类型，并在 `protocol.ts` 的 `GameState` /
+   `GamePrivate` 联合中汇总；如需新消息加进 `ClientMessage` / `ServerMessage`。
 2. `shared/src/`：加词库/数据文件并在 `index.ts` re-export。
 3. `shared/src/meta.ts`：`GAME_META` 加条目（名称/人数/玩法说明，大厅自动展示）。
 4. `server/src/games/xxx.ts`：实现 `Game` 接口（参考 `truth-dare.ts`，最简单的一个）；
    在 `server/src/games/index.ts` 工厂注册。**Timer 必须保存句柄并在 destroy() 清理。**
 5. `client/src/games/XxxGameView.tsx`：视图组件；`client/src/App.tsx` 的
-   `GameScreen` 里按 `game.game === 'xxx'` 挂载。
+   `GameScreen` 里按 `game.game === 'xxx'` 挂载。画布类玩法直接复用 `components/CanvasBoard.tsx`。
 6. `tests/xxx.mjs` + 把文件名加进 `tests/run-all.mjs` 的循环数组。
 7. `npm run typecheck && npm test` 全绿后提交。
 

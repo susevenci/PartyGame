@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
+import { randomInt } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { networkInterfaces } from 'node:os';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -10,7 +11,7 @@ import { Room } from './room.ts';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const ROOT = __dirname;
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT ?? 3000) || 3000;
 const STATIC_DIR = process.env.STATIC_DIR || join(ROOT, '../../client/dist');
 
 const MIME: Record<string, string> = {
@@ -55,9 +56,15 @@ export function startServer() {
     serveStatic(req, res);
   });
 
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws', maxPayload: 512 * 1024 });
 
   wss.on('connection', (ws) => {
+    ws.on('error', () => {
+      /* 单个连接异常不应影响其它房间；close 处理器负责回收会话 */
+    });
+    ws.on('close', () => {
+      sessions.delete(ws);
+    });
     ws.on('message', (raw) => {
       let msg: ClientMessage;
       try {
@@ -65,7 +72,12 @@ export function startServer() {
       } catch {
         return;
       }
-      handleClientMessage(ws, msg);
+      if (!msg || typeof msg !== 'object' || typeof (msg as { type?: unknown }).type !== 'string') return;
+      try {
+        handleClientMessage(ws, msg);
+      } catch (e) {
+        send(ws, { type: 'error', message: e instanceof Error ? e.message : '服务器处理失败' });
+      }
     });
   });
 
@@ -107,16 +119,15 @@ export function startServer() {
     const session = sessions.get(ws);
     if (!session) return;
     if (msg.type === 'leave') {
-      session.room.handleClientMessage(session.playerId, msg);
-      session.room.destroy();
       sessions.delete(ws);
+      session.room.handleClientMessage(session.playerId, msg);
       return;
     }
     session.room.handleClientMessage(session.playerId, msg);
   }
 
   function handleJoin(ws: WebSocket, msg: Extract<ClientMessage, { type: 'join' }>) {
-    const code = msg.code.trim().toUpperCase();
+    const code = String(msg.code ?? '').trim().toUpperCase();
     let room = code ? findRoom(code) : undefined;
 
     if (code && !room) {
@@ -155,7 +166,7 @@ export function startServer() {
   function randomCode(): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let c = '';
-    for (let i = 0; i < 6; i++) c += chars[Math.floor(Math.random() * chars.length)];
+    for (let i = 0; i < 6; i++) c += chars[randomInt(chars.length)];
     return c;
   }
 
@@ -189,7 +200,8 @@ async function serveStatic(req: import('node:http').IncomingMessage, res: import
     let p = normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, '');
     if (p === '' || p.endsWith('/')) p = join(p, 'index.html');
     const filePath = join(STATIC_DIR, p);
-    if (!filePath.startsWith(STATIC_DIR)) {
+    const root = STATIC_DIR.endsWith(sep) ? STATIC_DIR : STATIC_DIR + sep;
+    if (filePath !== STATIC_DIR && !filePath.startsWith(root)) {
       res.statusCode = 403;
       res.end('forbidden');
       return;

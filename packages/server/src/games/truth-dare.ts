@@ -1,6 +1,7 @@
 import { pickCard } from '@party-games/shared';
 import type { PlayerId, TruthDareState } from '@party-games/shared';
 import type { Game, GameContext } from './types.ts';
+import { Timer } from './util.ts';
 
 const ACT_MS = 60000;  // 表演/回答时间
 const RESULT_MS = 8000; // 结果展示时间
@@ -15,7 +16,6 @@ interface TData {
   history: { name: string; card: string; result: string }[];
   cardText: string;
   cardKind: 'truth' | 'dare';
-  timer: NodeJS.Timeout | null;
 }
 
 /**
@@ -27,6 +27,7 @@ interface TData {
 export class TruthDareGame implements Game {
   readonly id = 'truth-dare' as const;
   private s!: TData;
+  private timer = new Timer();
 
   start(ctx: GameContext): void {
     const ids = ctx.players.map((p) => p.id);
@@ -40,7 +41,6 @@ export class TruthDareGame implements Game {
       history: [],
       cardText: '',
       cardKind: 'truth',
-      timer: null,
     };
     this.dealCard(ctx);
     this.pushState(ctx);
@@ -135,22 +135,13 @@ export class TruthDareGame implements Game {
   }
 
   private later(ctx: GameContext, ms: number, fn: () => void): void {
-    this.clearTimer();
-    this.s.timer = setTimeout(() => {
-      this.s.timer = null;
+    this.timer.set(ms, () => {
       if (ctx.hostLeft) return;
       fn();
-    }, ms);
-  }
-
-  private clearTimer(): void {
-    if (this.s?.timer) {
-      clearTimeout(this.s.timer);
-      this.s.timer = null;
-    }
+    });
   }
 
   destroy(): void {
-    this.clearTimer();
+    this.timer.clear();
   }
 }

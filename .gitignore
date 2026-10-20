@@ -4,3 +4,5 @@ dist/
 *.tsbuildinfo
 .DS_Store
 .claude/
+# 本地浏览器验收截图
+shot-*.png

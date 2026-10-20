@@ -10,6 +10,8 @@ type Handler = (msg: ServerMessage) => void;
 export function useSocket(onMessage: Handler) {
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
+  const retryTimer = useRef(0);
+  const disposed = useRef(false);
   const [connected, setConnected] = useState(false);
   const handlerRef = useRef(onMessage);
   handlerRef.current = onMessage;
@@ -33,14 +35,18 @@ export function useSocket(onMessage: Handler) {
     ws.onclose = () => {
       setConnected(false);
       wsRef.current = null;
+      if (disposed.current) return;
       const delay = Math.min(1000 * 2 ** retryRef.current++, 10000);
-      setTimeout(connect, delay);
+      retryTimer.current = window.setTimeout(connect, delay);
     };
   }, []);
 
   useEffect(() => {
+    disposed.current = false;
     connect();
     return () => {
+      disposed.current = true;
+      window.clearTimeout(retryTimer.current);
       wsRef.current?.close();
     };
   }, [connect]);

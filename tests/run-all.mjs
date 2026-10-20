@@ -45,7 +45,21 @@ let exitCode = 0;
 try {
   await waitForServer();
   const results = [];
-  for (const name of ['werewolf', 'drawing', 'truth-dare']) {
+  for (const name of [
+    'room',
+    'werewolf',
+    'drawing',
+    'truth-dare',
+    'fake-artist',
+    'just-one',
+    'wavelength',
+    'fibbage',
+    'spyfall',
+    'bombparty',
+    'codenames',
+    'telephone',
+    'avalon',
+  ]) {
     console.log(`\n===== ${name} =====`);
     const ok = await runTest(name);
     results.push(`${name}: ${ok ? 'PASS' : 'FAIL'}`);

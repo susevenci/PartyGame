@@ -1,6 +1,7 @@
 import { pickWordPair } from '@party-games/shared';
 import type { PlayerId, WerewolfRole, WerewolfState } from '@party-games/shared';
 import type { Game, GameContext } from './types.ts';
+import { Timer } from './util.ts';
 
 const NIGHT_MS = 8000;
 const DAY_MS = 30000; // 描述阶段（口头进行，屏幕提示）
@@ -21,7 +22,6 @@ interface WData {
   winner?: WerewolfState['winner'];
   winReason?: string;
   lastWord: string;
-  timer: NodeJS.Timeout | null;
 }
 
 /**
@@ -33,6 +33,7 @@ interface WData {
 export class WerewolfGame implements Game {
   readonly id = 'werewolf' as const;
   private s!: WData;
+  private timer = new Timer();
 
   start(ctx: GameContext): void {
     const ids = ctx.players.map((p) => p.id);
@@ -49,7 +50,7 @@ export class WerewolfGame implements Game {
       alive: [...ids],
       phase: 'night', round: 1,
       hint: '天黑了，狼人请睁眼……',
-      votes: {}, lastWord: pair.common, timer: null,
+      votes: {}, lastWord: pair.common,
     };
     this.pushState(ctx);
     for (const id of ids) {
@@ -173,22 +174,13 @@ export class WerewolfGame implements Game {
   }
 
   private later(ctx: GameContext, ms: number, fn: () => void): void {
-    this.clearTimer();
-    this.s.timer = setTimeout(() => {
-      this.s.timer = null;
+    this.timer.set(ms, () => {
       if (ctx.hostLeft) return;
       fn();
-    }, ms);
-  }
-
-  private clearTimer(): void {
-    if (this.s?.timer) {
-      clearTimeout(this.s.timer);
-      this.s.timer = null;
-    }
+    });
   }
 
   destroy(): void {
-    this.clearTimer();
+    this.timer.clear();
   }
 }

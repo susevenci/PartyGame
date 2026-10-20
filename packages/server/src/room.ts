@@ -44,8 +44,9 @@ export class Room {
   }
 
   get hostId(): PlayerId {
-    const host = this.players.find((p) => p.isHost);
-    return host?.id ?? '';
+    const host = this.players.find((p) => p.isHost && p.connected);
+    if (host) return host.id;
+    return this.players.find((p) => p.connected)?.id ?? '';
   }
 
   get size(): number {
@@ -79,35 +80,32 @@ export class Room {
   }
 
   private handleDisconnect(id: PlayerId): void {
+    this.removePlayer(id);
+  }
+
+  /** 移除座位：空房销毁；房主离开则转让给下一位在线玩家 */
+  removePlayer(id: PlayerId): void {
     if (this.destroyed) return;
     const seat = this.seats.get(id);
     if (!seat) return;
-    // 保留座位（短暂离线可重连），若房间无人则销毁
-    seat.info.connected = false;
+    const wasHost = seat.info.isHost;
+    this.seats.delete(id);
+
     if (this.seats.size === 0) {
       this.destroy();
       return;
     }
-    if (seat.info.isHost) {
-      // 房主转让
-      const next = this.players.find((p) => p.connected);
+    if (wasHost) {
+      const next = [...this.seats.values()].find((s) => s.ws.readyState === 1);
       if (next) {
-        this.seats.get(next.id)!.info.isHost = true;
-        this.server.system(next.id, `${this.players.find((p) => p.name === seat.info.name)?.name ?? '玩家'} 掉线，房主已转让给 ${next.name}`);
+        next.info.isHost = true;
+        this.server.broadcast(this, {
+          type: 'system',
+          text: `${seat.info.name} 离开，房主已转让给 ${next.info.name}`,
+        });
       }
     }
-    if (this.status === 'playing') {
-      if (this.hostId === id) {
-        this.server.system(this.idOfAny(), '房主已掉线，游戏暂停中……');
-      }
-      this.roomUpdate();
-    } else {
-      this.roomUpdate();
-    }
-  }
-
-  private idOfAny(): PlayerId {
-    return this.seats.keys().next().value as PlayerId;
+    this.roomUpdate();
   }
 
   setReady(id: PlayerId, ready: boolean): void {
@@ -118,7 +116,10 @@ export class Room {
   }
 
   tryStart(id: PlayerId): void {
-    if (id !== this.hostId) return;
+    if (id !== this.hostId) {
+      this.server.error(id, '只有房主可以开始游戏');
+      return;
+    }
     if (this.status === 'playing') return;
     if (this.status === 'finished') {
       this.status = 'waiting';
@@ -139,13 +140,17 @@ export class Room {
     const game = createGame(this.game);
     this.gameInstance = game;
     this.status = 'playing';
-    this.server.system(this.idOfAny(), `🎮 游戏「${gameIdName(this.game)}」开始！`);
+    this.server.broadcast(this, { type: 'system', text: `🎮 游戏「${gameIdName(this.game)}」开始！` });
     this.roomUpdate();
     const ctx = this.buildCtx();
     game.start(ctx);
   }
 
   handleClientMessage(id: PlayerId, msg: ClientMessage): void {
+    if (msg.type === 'leave') {
+      this.removePlayer(id);
+      return;
+    }
     if (msg.type === 'ready') {
       this.setReady(id, msg.ready);
       return;
@@ -169,13 +174,20 @@ export class Room {
       return;
     }
     if (msg.type === 'finish-game') {
-      if (id !== this.hostId) return;
+      if (id !== this.hostId) {
+        this.server.error(id, '只有房主可以结束整局');
+        return;
+      }
       this.stopGame();
       return;
     }
     if (msg.type === 'rematch') {
-      if (id !== this.hostId || this.status !== 'finished') return;
-      this.start();
+      if (id !== this.hostId) {
+        this.server.error(id, '只有房主可以再来一局');
+        return;
+      }
+      if (this.status === 'playing' && this.gameInstance) this.stopGame();
+      if (this.status === 'finished') this.start();
       return;
     }
     if (this.status === 'playing' && this.gameInstance) {
@@ -201,7 +213,9 @@ export class Room {
     return {
       players: this.players,
       hostId: this.hostId,
-      hostLeft: this.ctx.hostLeft,
+      get hostLeft() {
+        return self.ctx.hostLeft;
+      },
       broadcast: (msg: ServerMessage) => self.server.broadcast(this, msg),
       sendTo: (pid: PlayerId, msg: ServerMessage) => self.server.sendTo(pid, msg),
       name: (pid: PlayerId) => self.seats.get(pid)?.info.name ?? '未知玩家',

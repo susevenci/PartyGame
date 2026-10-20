@@ -1,0 +1,97 @@
+# PartyGames 知识库 / Wiki 构建计划
+# 说明：本文件作为 wiki 与知识卡片构建时的强先验注入；修改后需重新运行构建才会生效。
+
+version: 1
+
+scope:
+  # 不设白名单：packages/**、tests/** 与根目录配置全部纳入
+  include: []
+  exclude:
+    - "**/dist/**"
+    - "package-lock.json"
+
+repowiki:
+  # 未指定预设模板（architecture / product_requirement），章节由 LLM 按项目实际情况组织
+  template: ""
+
+  notes:
+    - text: 项目定位是「电脑 + 手机浏览器都能玩的多人在线聚会小游戏合集」，v1 已完结，含 12 款游戏（谁是卧底 / 你画我猜 / 真心话大冒险 / 假画家 / 一字提示 / 波长 / 编瞎话 / 间谍游戏 / 词语炸弹 / 行动代号 / 传话画图 / 阿瓦隆）；无数据库，房间与游戏状态全部驻留内存，进程重启即清空。
+    - text: 仓库是 npm workspaces monorepo（packages/shared、packages/server、packages/client）加 tests/ 冒烟测试目录，要求 Node ≥ 20；构建顺序固定为 shared → client → server。
+    - text: packages/shared 是前后端唯一契约：WebSocket 消息、游戏公开状态、游戏元信息与词库都在这里定义，client/server 不允许自建消息结构。
+    - text: 通信层是纯 ws 加单条 JSON（以 type 字段判别的 Discriminated Union），没有使用 socket.io；服务端是唯一权威，客户端只提交意图（vote / answer / draw / pick-card 等），收到的 game-state 只作展示。
+    - text: 三类消息边界必须写清：game-state 是公开广播，game-private 只发给本人（卧底身份、要画的词），system / chat / card 属于信息流；私密信息严禁混进 game-state 或任何广播。
+    - text: packages/shared 的 package.json exports 中 types 指向 src/*.ts、import 指向 dist/*.js，因此改动 shared 后必须先构建 shared，否则服务端运行时会读到旧 dist。
+    - text: server 与 shared 包内的相对导入必须带 .ts 扩展名（tsconfig 开启 rewriteRelativeImportExtensions），否则 Node ESM 运行时解析失败。
+    - text: 游戏插件化是核心扩展点：新游戏等于 shared 加类型与词库、server/src/games/ 实现 Game 并注册、client/src/games/ 加视图；不得为了单个游戏改动 room.ts 主流程。
+    - text: 定时器纪律：游戏内所有 setTimeout 必须保存句柄、在 destroy() 中 clearTimeout，推进状态前先检查 ctx.hostLeft。
+    - text: 房间生命周期：玩家 leave 或连接关闭即释放座位，房主离开自动转让给下一位在线玩家，最后一人离开立即销毁；服务端对缺失字段 / 非对象报文回 error，不能让异常抛到事件循环。
+    - text: 运行形态：开发模式 server 3000 与 client 5173（Vite 代理 /ws 与 /api），生产模式 npm run build 后 npm start 由 server 直接托管 packages/client/dist；环境变量 PORT 默认 3000、STATIC_DIR 默认 packages/client/dist，冒烟测试使用 3100 端口。
+    - text: v1 已知限制不要写成已完成能力：断线即释放座位且没有重连令牌、卧底夜晚由服务端随机击杀、你画我猜画布仅保留最近 300 笔、猜词使用包含式宽松匹配、无前端组件测试；阿瓦隆为简化版（仅梅林/刺客/爪牙/忠臣），词语炸弹为中文改编版（只校验含字、去重与纯中文）。
+    - text: 代码规范：TypeScript strict 与 noUncheckedIndexedAccess 全开且禁止 any；函数 ≤ 50 行、文件 ≤ 400 行；UI 文案统一中文并用 emoji 当图标；移动端优先（≤520px、Pointer Events、safe-area）。
+
+  documents:
+    - title: 项目总览与快速上手
+      goal: 一页交代项目定位、三款游戏的玩法与人数、仓库目录结构、常用命令与部署方式，让新读者能独立跑起来。
+      hints: 依据 README.md、HANDOFF.md、CLAUDE.md 与根 package.json；说明 npm run dev / build / start / typecheck / test 的实际行为与端口占用，并单列 v1 已知限制。
+
+    - title: 通信协议与游戏状态模型
+      goal: 讲清 shared/src/protocol.ts 的判别联合设计、客户端与服务端消息分类，以及三种游戏公开状态的字段含义与私密信息边界。
+      hints: 覆盖 ClientMessage、ServerMessage、GameState、GamePrivate、DrawOp、RoomInfo、PlayerInfo；强调 protocol.ts 是唯一契约来源，改协议必须先改 shared。
+
+    - title: 服务端入口与房间系统
+      goal: 解释 HTTP 静态托管、/api/lan、WebSocketServer 的启动流程，以及 Room 的座位模型、房主规则、生命周期与消息分发。
+      hints: packages/server/src/index.ts 与 room.ts；覆盖 6 位房号生成、加入校验（昵称长度/重名/满员/游戏中）、房主掉线转让、空房回收与 60s 清理、静态资源路径穿越防护。
+
+    - title: 游戏插件机制与新增游戏流程
+      goal: 说明 Game 与 GameContext 的接口契约、工厂注册方式，并给出新增一款小游戏的完整改动清单。
+      hints: server/src/games/types.ts 与 games/index.ts；说明 getState 补发、destroy 清理，以及为什么不允许在 room.ts 里写具体游戏逻辑。
+
+    - title: 绘画与传话玩法（你画我猜 / 假画家 / 传话画图）
+      goal: 对比三款复用画布的玩法，说明归一化笔迹协议、私密词与上一步内容下发、轮转规则以及各自的计分/胜负条件。
+      hints: server/src/games 下的 drawing.ts、fake-artist.ts、telephone.ts 与对应视图；共用 client/src/components/CanvasBoard.tsx（CanvasBoard / StaticCanvas）；DrawOp 坐标 0~1，Pointer Events，画布历史上限 300 条、单次提交上限 40 笔。
+      template: |
+        ## 共用的画布与笔迹协议
+        ## 各游戏规则与状态机
+        ## 服务端实现要点
+        ## 客户端视图与交互
+        ## 已知限制与扩展点
+
+    - title: 推理与阵营玩法（谁是卧底 / 间谍游戏 / 阿瓦隆 / 行动代号）
+      goal: 梳理四款依赖私密身份或私密视角的玩法，讲清 game-private 的下发对象、阶段状态机与胜负判定。
+      hints: werewolf.ts、spyfall.ts、avalon.ts、codenames.ts 与对应视图；卧底词卡、间谍地点表、阿瓦隆身份/坏人名单、行动代号队长颜色矩阵都只能走 sendTo；阿瓦隆含组队投票、任务投票、连续否决与终局刺杀。
+      template: |
+        ## 私密信息与公开状态的边界
+        ## 各游戏规则与状态机
+        ## 服务端实现要点
+        ## 客户端视图与交互
+        ## 已知限制与扩展点
+
+    - title: 词语与默契玩法（真心话大冒险 / 一字提示 / 波长 / 编瞎话 / 词语炸弹）
+      goal: 归纳五款以文字、计时和计分为主的玩法，说明各自的输入校验、轮次推进与计分规则。
+      hints: truth-dare.ts、just-one.ts、wavelength.ts、fibbage.ts、bombparty.ts 与对应视图；一字提示的重复提示整组作废、编瞎话的假答案混入与投票、波长的目标值仅揭示阶段公开、词语炸弹的含字/去重/纯中文校验。
+      template: |
+        ## 各游戏规则与轮次
+        ## 服务端实现要点
+        ## 客户端视图与交互
+        ## 题库与可扩展点
+        ## 已知限制
+
+    - title: 前端应用结构与实时连接
+      goal: 梳理 App.tsx 的状态中枢与消息分发、useSocket 的重连策略、大厅与等待室的屏幕切换、共用组件与移动端样式约定。
+      hints: client/src 下的 App.tsx、net/useSocket.ts、screens、components/common.tsx、styles.css；指数退避 1s 到 10s 封顶，localStorage 只存昵称与头像，布局基准 ≤520px。
+
+    - title: 共享元信息与词库
+      goal: 说明 GAME_META / GAME_LIST / AVATARS 的作用，以及三套词库（卧底词对、画词、真心话与大冒险卡）的结构与取词函数。
+      hints: shared/src 下的 meta.ts、words.ts、drawing-words.ts、truth-dare.ts、index.ts；词库随机取词，暂无去重或已用词记录。
+
+    - title: 构建、类型检查与冒烟测试
+      goal: 说明 workspace 脚本编排、tsc 与 vite 的产物路径，以及 tests/ 如何自动起停服务器并跑完三个游戏的多人协议冒烟测试。
+      hints: 根 package.json 的 scripts、tests/run-all.mjs 与三个 .mjs 脚本；测试端口 3100，通过 PG_URL 环境变量把地址传给子进程。
+
+knowledgecard:
+  notes:
+    - text: 依赖方向单向：client 与 server 只依赖 shared，shared 不反向依赖任何包；shared 内部 base.ts 放基础结构、protocol.ts 放消息契约与 GameState/GamePrivate 汇总、states/ 按游戏拆状态与私密类型、meta.ts 放游戏元信息与头像、其余 *-words.ts / *-questions.ts / *-prompts.ts 放词库与题库，统一由 index.ts re-export。
+    - text: server 模块边界：index.ts 负责进程入口、HTTP / WS 会话与房间注册表；room.ts 只负责座位、房主与生命周期且不认识具体游戏；games/ 下每个文件是一个独立游戏状态机，types.ts 定义接口、index.ts 做工厂注册、util.ts 放 Timer / 笔迹校验 / 文本规范化等公共工具。
+    - text: client 模块边界：App.tsx 是唯一状态中枢与消息分发点；net/useSocket.ts 只负责连接与指数退避重连；screens/ 是大厅与等待室；games/ 每款游戏一个视图组件；components/common.tsx 存放共用 UI（GameTopBar / AvatarChip / Feed / PlayerStrip），components/CanvasBoard.tsx 提供可交互与只读画布。
+    - text: 新增一款游戏的改动面固定为五处：shared/src/states/ 加状态与私密类型并在 protocol.ts 汇总、shared 词库与 index re-export、meta.ts 的 GAME_META 条目、server/src/games/ 实现并在工厂注册、client/src/games/ 视图并在 App.tsx 挂载；并补 tests/ 冒烟脚本后加入 run-all.mjs 的循环数组。
+    - text: 命名与规范：模块文件 camelCase、React 组件 PascalCase.tsx；函数只做一件事且 ≤50 行、文件 ≤400 行；注释只写为什么与协议约束；服务端对未知消息类型静默忽略，对非法操作回 error 消息而不是抛异常。

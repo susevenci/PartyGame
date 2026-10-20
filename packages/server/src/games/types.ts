@@ -31,8 +31,6 @@ export interface Game {
   start(ctx: GameContext): void;
   /** 处理一条客户端消息，senderId 为发送者（服务端可信） */
   onMessage(ctx: GameContext, msg: ClientMessage, senderId: PlayerId): void;
-  /** 房间循环心跳（1 秒一次），游戏可用于倒计时等 */
-  tick?(ctx: GameContext): void;
   /** 结束：清理内部定时器与状态 */
   destroy(): void;
   /** 当前公开状态（中途加入者补发，可选实现） */

@@ -5,6 +5,7 @@ import type {
   PlayerId,
 } from '@party-games/shared';
 import type { Game, GameContext } from './types.ts';
+import { Timer } from './util.ts';
 
 const GUESS_MS = 45000; // 每轮作画 + 猜测时间
 const REVEAL_MS = 6000; // 揭示答案时间
@@ -20,7 +21,6 @@ interface DData {
   totalScores: Record<PlayerId, number>;
   correct: PlayerId[]; // 本轮已猜中（有序，第一个 2 分其余 1 分）
   phase: DrawingState['phase'];
-  timer: NodeJS.Timeout | null;
   finished: boolean;
 }
 
@@ -32,6 +32,7 @@ interface DData {
 export class DrawingGame implements Game {
   readonly id = 'drawing' as const;
   private s!: DData;
+  private timer = new Timer();
 
   start(ctx: GameContext): void {
     const ids = ctx.players.map((p) => p.id);
@@ -46,7 +47,6 @@ export class DrawingGame implements Game {
       totalScores: Object.fromEntries(ids.map((i) => [i, 0])),
       correct: [],
       phase: 'draw',
-      timer: null,
       finished: false,
     };
     this.newRound(ctx);
@@ -125,7 +125,7 @@ export class DrawingGame implements Game {
   private reveal(ctx: GameContext): void {
     const s = this.s;
     if (s.phase === 'reveal') return;
-    this.clearTimer();
+    this.timer.clear();
     s.phase = 'reveal';
     // 结算
     for (const [pid, sc] of Object.entries(s.scores)) {
@@ -173,22 +173,13 @@ export class DrawingGame implements Game {
   }
 
   private later(ctx: GameContext, ms: number, fn: () => void): void {
-    this.clearTimer();
-    this.s.timer = setTimeout(() => {
-      this.s.timer = null;
+    this.timer.set(ms, () => {
       if (ctx.hostLeft) return;
       fn();
-    }, ms);
-  }
-
-  private clearTimer(): void {
-    if (this.s?.timer) {
-      clearTimeout(this.s.timer);
-      this.s.timer = null;
-    }
+    });
   }
 
   destroy(): void {
-    this.clearTimer();
+    this.timer.clear();
   }
 }

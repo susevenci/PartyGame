@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AVATARS, GAME_META } from '@party-games/shared';
 import type {
   GameId,
@@ -13,6 +13,15 @@ import { RoomScreen } from './screens/Room';
 import { WerewolfGameView } from './games/WerewolfGameView';
 import { DrawingGameView } from './games/DrawingGameView';
 import { TruthDareGameView } from './games/TruthDareGameView';
+import { FakeArtistGameView } from './games/FakeArtistGameView';
+import { JustOneGameView } from './games/JustOneGameView';
+import { WavelengthGameView } from './games/WavelengthGameView';
+import { FibbageGameView } from './games/FibbageGameView';
+import { SpyfallGameView } from './games/SpyfallGameView';
+import { BombPartyGameView } from './games/BombPartyGameView';
+import { CodenamesGameView } from './games/CodenamesGameView';
+import { TelephoneGameView } from './games/TelephoneGameView';
+import { AvalonGameView } from './games/AvalonGameView';
 import type { ChatLine } from './components/common';
 
 interface MyProfile {
@@ -118,6 +127,20 @@ export function App() {
   const { connected, send } = useSocket(handleServerMessage);
 
   const inRoom = room !== null && myId !== null;
+  const wasConnected = useRef(false);
+
+  // 服务端在连接断开时释放座位，因此前端也应回到大厅，避免停留在已失效的房间界面
+  useEffect(() => {
+    if (connected) {
+      wasConnected.current = true;
+      return;
+    }
+    if (!wasConnected.current) return;
+    setMyId(null);
+    setRoom(null);
+    resetGame();
+    showToast('连接已断开，已回到大厅');
+  }, [connected, resetGame, showToast]);
 
   // 游戏进行中收到错误提示时不打断画面，仅 toast
   return (
@@ -203,6 +226,58 @@ function GameScreen(props: {
         />
       )}
       {game.game === 'truth-dare' && <TruthDareGameView state={game} {...common} />}
+      {game.game === 'fake-artist' && (
+        <FakeArtistGameView
+          state={game}
+          privateData={privateData?.data.game === 'fake-artist' ? privateData.data : null}
+          drawOps={drawOps}
+          {...common}
+        />
+      )}
+      {game.game === 'just-one' && (
+        <JustOneGameView
+          state={game}
+          privateData={privateData?.data.game === 'just-one' ? privateData.data : null}
+          {...common}
+        />
+      )}
+      {game.game === 'wavelength' && (
+        <WavelengthGameView
+          state={game}
+          privateData={privateData?.data.game === 'wavelength' ? privateData.data : null}
+          {...common}
+        />
+      )}
+      {game.game === 'fibbage' && <FibbageGameView state={game} {...common} />}
+      {game.game === 'spyfall' && (
+        <SpyfallGameView
+          state={game}
+          privateData={privateData?.data.game === 'spyfall' ? privateData.data : null}
+          {...common}
+        />
+      )}
+      {game.game === 'bombparty' && <BombPartyGameView state={game} {...common} />}
+      {game.game === 'codenames' && (
+        <CodenamesGameView
+          state={game}
+          privateData={privateData?.data.game === 'codenames' ? privateData.data : null}
+          {...common}
+        />
+      )}
+      {game.game === 'telephone' && (
+        <TelephoneGameView
+          state={game}
+          privateData={privateData?.data.game === 'telephone' ? privateData.data : null}
+          {...common}
+        />
+      )}
+      {game.game === 'avalon' && (
+        <AvalonGameView
+          state={game}
+          privateData={privateData?.data.game === 'avalon' ? privateData.data : null}
+          {...common}
+        />
+      )}
       <button className="ghost" style={{ alignSelf: 'center', margin: '8px auto', marginBottom: 'calc(10px + env(safe-area-inset-bottom))' }} onClick={onLeave}>
         退出房间
       </button>
