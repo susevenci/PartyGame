@@ -24,6 +24,14 @@
 
 ## 快速开始
 
+### 最省事：双击启动（Windows）
+
+装好 [Node.js 20+](https://nodejs.org/) 后，双击仓库根目录的 **`start-dev.bat`**：
+首次运行会自动 `npm install`，随后构建 shared 并同时启动前端与后端
+（server:3000 + client:5173）。按 Ctrl+C 或关闭窗口即停止。
+
+### 命令行方式
+
 ```bash
 # 0. 克隆仓库
 git clone https://github.com/susevenci/PartyGame.git
@@ -32,8 +40,9 @@ cd PartyGame
 # 1. 安装依赖（需要 Node >= 20）
 npm install
 
-# 2. 开发模式（server 3000 + client 5173 热更新）
+# 2. 开发模式：一条命令同时启动 server(3000) 与 client(5173, 热更新)
 npm run dev
+# 若 PowerShell 提示“禁止运行脚本”，改用：npm.cmd run dev
 # 手机与电脑同一 WiFi：访问终端打印的 http://<电脑局域网IP>:5173（或 3000）
 # 电脑访问 http://localhost:5173
 
@@ -70,13 +79,12 @@ packages/server   纯 Node + ws 服务端：房间系统 + 游戏插件
 packages/client   Vite + React 18 + TS 前端
 ```
 
-**新增一个小游戏只需 5 步**（详见 `CLAUDE.md`）：
+**新增一个小游戏只需 4 步**（详见 `CLAUDE.md`）：
 
 1. `shared/src/states/` 加状态与私密信息类型，并在 `protocol.ts` 的 `GameState` / `GamePrivate` 里汇总；
 2. `server/src/games/xxx.ts` 实现 `Game` 接口并在 `games/index.ts` 注册；
 3. `shared/src/meta.ts` 加游戏元信息（名称/人数/玩法说明）；
-4. `client/src/games/XxxGameView.tsx` 写视图并在 `App.tsx` 挂载；
-5. `tests/xxx.mjs` 加协议冒烟测试并加入 `tests/run-all.mjs`。
+4. `client/src/games/XxxGameView.tsx` 写视图并在 `App.tsx` 挂载。
 
 ## 技术选型说明
 

@@ -7,8 +7,7 @@
 ## 一句话现状
 
 **v0.2.0 已完成并验证**：12 款聚会小游戏（谁是卧底 / 你画我猜 / 真心话大冒险 / 假画家 / 一字提示 / 波长 / 编瞎话 / 间谍游戏 / 词语炸弹 / 行动代号 / 传话画图 / 阿瓦隆）的
-完整多人在线功能已实现，服务端协议通过 13 个自动化冒烟测试（含房间生命周期，`npm test` 全绿），
-生产构建可一键运行（`npm run build && npm start`），手机/电脑浏览器均可玩。
+完整多人在线功能已实现，生产构建可一键运行（`npm run build && npm start`），手机/电脑浏览器均可玩。
 代码已推送至 GitHub：<https://github.com/susevenci/PartyGame>（默认分支 `main`）。
 
 ## 新机器上手（克隆 → 验证 → 继续开发）
@@ -18,11 +17,10 @@ git clone https://github.com/susevenci/PartyGame.git
 cd PartyGame
 npm install          # 依赖由 package-lock.json 锁定，Node >= 20
 npm run typecheck    # 应全绿
-npm test             # 自动构建 shared+server 并跑 12 个协议冒烟测试，应全 PASS
-npm run dev          # 开发：server:3000 + client:5173
+npm run dev          # 开发：server:3000 + client:5173（Windows 也可双击根目录 start-dev.bat）
 ```
 
-提交规范：Conventional Commits（见文末）；推送前先 `npm run typecheck && npm test`。
+提交规范：Conventional Commits（见文末）；推送前先 `npm run verify`（typecheck + build）。
 
 ## 环境要求
 
@@ -35,11 +33,11 @@ npm run dev          # 开发：server:3000 + client:5173
 ```bash
 npm install                 # 安装依赖
 npm run dev                 # 开发模式：server:3000 + client:5173（热更新）
+start-dev.bat               # Windows 双击启动：装依赖 + 构建 shared + 同起前后端（= npm run dev）
 npm run typecheck           # 全 workspace 类型检查（提交前必跑）
 npm run build               # 构建 shared → client → server
 npm start                   # 生产模式：http://localhost:3000（server 托管前端产物）
-npm test                    # 冒烟测试（自动构建 shared+server，起 :3100 测试服务器，跑完自动关）
-npm run verify              # typecheck + test + build，提交前一键验证
+npm run verify              # typecheck + build，提交前一键验证
 ```
 
 ## 已完成清单（v1）
@@ -63,7 +61,6 @@ npm run verify              # typecheck + test + build，提交前一键验证
 - [x] 词库：卧底词对 ~95 组、画词 ~96 个、真心话 30 + 大冒险 30
 - [x] 房间等待室：房号复制、局域网地址自动探测（`/api/lan`）、就绪机制
 - [x] 移动端适配：≤520px 布局、safe-area、触摸画布
-- [x] 冒烟测试：`tests/`（12 款游戏各一个多进程 WebSocket 客户端测试，`tests/lib.mjs` 共用连接辅助）
 - [x] 规范文档：CLAUDE.md（整合自 awesome-cursorrules-zh）
 - [x] 生产静态托管 + 路径穿越防护
 
@@ -77,7 +74,8 @@ npm run verify              # typecheck + test + build，提交前一键验证
 4. **无 PWA**：手机只能从地址访问，无法添加到主屏。后续可加 manifest + Service Worker
    （注意 `/ws` 与动态地址，SW 只做缓存不拦截 WS）。
 5. **猜测匹配偏宽松**：`drawing.ts` 的 `handleGuess` 允许子串匹配，"猫" 能猜中 "熊猫"。
-6. **无前端组件测试**：目前只有服务端协议冒烟测试。
+6. **无自动化测试**：13 个协议冒烟用例曾全部通过，后按“只交付游戏本体”的要求移除；
+   回归时需手工点验，恢复测试可从 git 历史取回 `tests/`。
 7. 谁是卧底的描述阶段是 30s 计时提示（口头描述），未做“轮到谁发言”的强提示高亮。
 8. **阿瓦隆是简化版**：只有梅林 / 刺客 / 爪牙 / 忠臣，没有派西维尔、莫甘娜、莫德雷德；第 4 轮 7 人以上需要 2 张失败票。
 9. **词语炸弹是中文改编版**：只校验「含指定汉字 + 不重复 + 纯中文 + 2~8 字」，不做真实词典校验。
@@ -117,15 +115,15 @@ party-games/
 ├── CLAUDE.md            ★ 项目规范（先读）
 ├── README.md            用户向：玩法/部署
 ├── HANDOFF.md           ← 本文（开发者/Agent 向：现状/坑/路线）
-├── packages/
-│   ├── shared/          协议契约 + 元信息 + 词库
-│   │   └── src/{base,protocol,meta,index}.ts、states/(12 款游戏状态)、各游戏词库文件
-│   ├── server/          纯 Node + ws
-│   │   └── src/{index.ts(入口/HTTP/WS), room.ts(房间), games/(12 款游戏 + types + util + 注册)}
-│   └── client/          Vite + React 18
-│       └── src/{App.tsx, main.tsx, styles.css, net/useSocket.ts,
-│                 screens/{Lobby,Room}.tsx, games/(12 个视图), components/{common,CanvasBoard}.tsx}
-└── tests/               冒烟测试（run-all.mjs 自动起停服务器）
+├── start-dev.bat        Windows 双击一键启动（可选）
+└── packages/
+    ├── shared/          协议契约 + 元信息 + 词库
+    │   └── src/{base,protocol,meta,index}.ts、states/(12 款游戏状态)、各游戏词库文件
+    ├── server/          纯 Node + ws
+    │   └── src/{index.ts(入口/HTTP/WS), room.ts(房间), games/(12 款游戏 + types + util + 注册)}
+    └── client/          Vite + React 18
+        └── src/{App.tsx, main.tsx, styles.css, net/useSocket.ts,
+                  screens/{Lobby,Room}.tsx, games/(12 个视图), components/{common,CanvasBoard}.tsx}
 ```
 
 ## 添加一个新小游戏的标准步骤（照抄）
@@ -138,8 +136,7 @@ party-games/
    在 `server/src/games/index.ts` 工厂注册。**Timer 必须保存句柄并在 destroy() 清理。**
 5. `client/src/games/XxxGameView.tsx`：视图组件；`client/src/App.tsx` 的
    `GameScreen` 里按 `game.game === 'xxx'` 挂载。画布类玩法直接复用 `components/CanvasBoard.tsx`。
-6. `tests/xxx.mjs` + 把文件名加进 `tests/run-all.mjs` 的循环数组。
-7. `npm run typecheck && npm test` 全绿后提交。
+6. `npm run verify`（typecheck + build）通过后提交。
 
 ## 部署提醒
 
@@ -149,4 +146,4 @@ party-games/
 
 ## 提交信息（Conventional Commits）
 
-`feat(scope): 描述` / `fix(scope): 描述`，scope ∈ server | client | shared | tests | docs。
+`feat(scope): 描述` / `fix(scope): 描述`，scope ∈ server | client | shared | docs。

@@ -3,6 +3,24 @@
 本文件记录 PartyGames 的重要变更。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 新增
+
+- 新增 Windows 一键启动脚本 `start-dev.bat`：首次运行自动安装依赖，随后构建 shared
+  并同时启动前后端（等价于 `npm run dev`），同时避开 PowerShell 脚本执行策略限制。
+
+### 变更
+
+- 移除 `tests/` 目录与 `npm test` 脚本：13 个协议冒烟用例全部通过后，按“只交付游戏本体”的要求清理；
+  `npm run verify` 改为 typecheck + build。
+- 文档：README / HANDOFF / CLAUDE 补充一键启动说明，并同步移除测试相关引用。
+
+### 修复
+
+- 客户端：Vite 开发服务器改为监听所有网卡（`host: true`），修复手机与电脑同一 WiFi 时
+  无法访问 `http://<局域网IP>:5173` 的问题。
+
 ## [0.2.0] - 2026-10-20
 
 ### 新增

@@ -13,8 +13,7 @@
     "build": "npm run build -w @party-games/shared && npm run build -w @party-games/client && npm run build -w @party-games/server",
     "start": "npm run start -w @party-games/server",
     "typecheck": "npm run typecheck --workspaces",
-    "test": "npm run build -w @party-games/shared && npm run build -w @party-games/server && node tests/run-all.mjs",
-    "verify": "npm run typecheck && npm test && npm run build",
+    "verify": "npm run typecheck && npm run build",
     "preview": "npm run build && npm run start -w @party-games/server"
   },
   "devDependencies": {

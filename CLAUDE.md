@@ -80,11 +80,11 @@ party-games/
 
 ```bash
 npm run dev        # 同时起 server(3000) 与 client(5173, 已配 /ws 代理)
+start-dev.bat      # Windows 双击一键启动（装依赖 + 构建 shared + 同起前后端）
 npm run build      # shared → client → server 依次构建
 npm start          # 生产模式：server 直接托管 client/dist
 npm run typecheck  # 全 workspace 类型检查（提交前必跑）
-npm test           # 构建 shared+server 并跑 13 个协议冒烟测试（含房间生命周期）
-npm run verify     # typecheck + test + build，一条命令完成提交前验证
+npm run verify     # typecheck + build，一条命令完成提交前验证
 ```
 
 - 提交前必须 `npm run typecheck` 通过。
